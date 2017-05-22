@@ -1,0 +1,64 @@
+#!/bin/bash
+usage() {
+    cat <<__EOF__
+Commit workspace without modifying workspace, index, or HEAD
+
+Usage: $(basename "$0") ref
+  ref    - local ref name such as 'refs/heads/local-history', 'refs/history/master', or 'SYNC'
+__EOF__
+}
+main() {
+    case "$1" in
+        -h|--help) usage; exit;;
+    esac
+    case $# in
+        1) sync-workspace "$1";;
+        *) usage; exit 1;;
+    esac
+}
+sync-workspace() {
+    local ref="$1"
+    switch-to-sync-index
+    merge-conflicts-exist && die "Aborting: unmerged changes"
+    local-changes-exist || exit 0
+    commit-workspace "${ref}"
+}
+switch-to-sync-index() {
+    local git_dir; git_dir="$(git rev-parse --git-dir)" || die "Failed to determine git directory"
+    export GIT_INDEX_FILE="${git_dir}/SYNC-index"
+}
+merge-conflicts-exist() {
+    git ls-files --unmerged | grep -q .
+}
+local-changes-exist() {
+    git ls-files --modified --deleted --others | grep -q .
+}
+commit-workspace() {
+    local ref="$1"
+    local tree commit
+    ensure-ref-exists "${ref}"
+    add-modified-deleted-and-new-files-to-index || die "Failed to create index"
+    tree="$(git write-tree)" || die "Failed to create tree"
+    commit="$(git commit-tree "${tree}" -p "${ref}" -m "SYNC: $(date)")" || die "Failed to create commit"
+    git update-ref "${ref}" "${commit}" || die "Failed to update ref"
+}
+ensure-ref-exists() {
+    local ref="$1"
+    if ! git rev-parse --verify "${ref}" &> /dev/null; then
+        local commit
+        if git rev-parse --verify HEAD &> /dev/null; then
+            commit=HEAD
+        else
+            commit="$(git commit-tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904 -m 'SYNC: empty tree')" || die "Failed to create empty commit"
+        fi
+        git update-ref "${ref}" "${commit}" || die "Failed to create ref: '${ref}'"
+    fi
+}
+add-modified-deleted-and-new-files-to-index() {
+    git add --all
+}
+die() {
+    >&2 echo -e "\nERROR: $*\n"
+    exit 1
+}
+main "$@"

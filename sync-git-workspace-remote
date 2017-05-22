@@ -1,0 +1,48 @@
+#!/bin/bash
+usage() {
+    cat <<__EOF__
+Commit workspace and push to remote repo without modifying workspace, index, or HEAD
+
+Usage: $(basename "$0") ref repo branch
+  ref       - local ref to update (see sync-git-workspace-local)
+  repo      - remote repo or name suitable for 'git push'
+  branch    - remote branch name to push snapshots to
+
+To backup to remote repo, make sure one of the following is true:
+  1) remote workspace is a bare repository,
+  2) remote branch is not checked out, or
+  3) 'receive.denyCurrentBranch' is set to something other than 'refuse' which is the default
+
+To sync to remote workspace (git >= 2.3.0):
+  - checkout the remote branch in the remote repo and
+  - set 'receive.denyCurrentBranch' to 'updateInstead'
+    e.g. 'git config --add receive.denyCurrentBranch updateInstead' in the remote repo
+
+History:
+  - the local ref and the remote branch tracks changes pushed to the remote repo
+    e.g. Run 'git log "\${ref}"' in the local repo to view the history of changes
+    e.g. Run 'git log "\${branch}"' in the remote repo to view the history of changes
+__EOF__
+}
+main() {
+    case "$1" in
+        -h|--help) usage; exit;;
+    esac
+    case $# in
+        3) sync-workspace "$@";;
+        *) usage; exit 1;;
+    esac
+}
+sync-workspace() {
+    local local_ref="$1"
+    local remote_repo="$2"
+    local remote_ref="$3"
+    if sync-git-workspace-local "${local_ref}"; then
+      git push --force "${remote_repo}" "${local_ref}:${remote_ref}" || die "Failed to push to remote repo"
+    fi
+}
+die() {
+    >&2 echo -e "\nERROR: $*\n"
+    exit 1
+}
+main "$@"
