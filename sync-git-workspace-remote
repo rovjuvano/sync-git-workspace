@@ -38,7 +38,11 @@ sync-workspace() {
     local remote_repo="$2"
     local remote_ref="$3"
     if sync-git-workspace-local "${local_ref}"; then
-      git push --force "${remote_repo}" "${local_ref}:${remote_ref}" || die "Failed to push to remote repo"
+      if git push --force --quiet "${remote_repo}" "${local_ref}:${remote_ref}"; then
+        git --no-pager log -1 --oneline --stat "${local_ref}"
+      else
+        die "Failed to push to remote repo"
+      fi
     fi
 }
 die() {
