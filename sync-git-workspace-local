@@ -36,26 +36,24 @@ local-changes-exist() {
 commit-workspace() {
     local ref="$1"
     local tree commit
-    ensure-ref-exists "${ref}"
     add-modified-deleted-and-new-files-to-index || die "Failed to create index"
     tree="$(git write-tree)" || die "Failed to create tree"
-    commit="$(git commit-tree "${tree}" -p "${ref}" -m "SYNC: $(date)")" || die "Failed to create commit"
+    commit="$(commit-tree "${ref}" "${tree}")" || die "Failed to create commit"
     git update-ref "${ref}" "${commit}" || die "Failed to update ref"
-}
-ensure-ref-exists() {
-    local ref="$1"
-    if ! git rev-parse --verify "${ref}" &> /dev/null; then
-        local commit
-        if git rev-parse --verify HEAD &> /dev/null; then
-            commit=HEAD
-        else
-            commit="$(git commit-tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904 -m 'SYNC: empty tree')" || die "Failed to create empty commit"
-        fi
-        git update-ref "${ref}" "${commit}" || die "Failed to create ref: '${ref}'"
-    fi
 }
 add-modified-deleted-and-new-files-to-index() {
     git add --all
+}
+commit-tree() {
+    local ref="$1"
+    local tree="$2"
+    local options=(-m "SYNC: $(date)")
+    ref-exists "${ref}" && options+=(-p "${ref}")
+    git commit-tree "${options[@]}" "${tree}"
+}
+ref-exists() {
+    local ref="$1"
+    git rev-parse --verify "${ref}" &>/dev/null
 }
 die() {
     >&2 echo -e "\nERROR: $*\n"
