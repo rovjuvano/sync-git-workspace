@@ -31,7 +31,7 @@ merge-conflicts-exist() {
     git ls-files --unmerged | grep -q .
 }
 local-changes-exist() {
-    git ls-files --modified --deleted --others | grep -q .
+    git ls-files --modified --deleted --others --exclude-standard | grep -q .
 }
 commit-workspace() {
     local ref="$1"
